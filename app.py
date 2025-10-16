@@ -225,31 +225,31 @@ def generate_npc_response(question, npc_info, scenario, previous_questions):
         return "죄송합니다. 지금은 대답하기 어렵습니다."
 
 def calculate_final_score(question_count, avg_quality_score):
-    """최종 점수를 계산합니다 (1000점 만점)."""
+    """최종 점수를 계산합니다 (100점 만점)."""
     
-    # 질문 품질 점수 (500점 만점)
-    quality_score = 500 * (avg_quality_score / 100)
+    # 질문 품질 점수 (50점 만점)
+    quality_score = 50 * (avg_quality_score / 100)
     
-    # 질문 횟수 점수 (500점 만점)
+    # 질문 횟수 점수 (50점 만점)
     if question_count <= 10:
-        count_score = 500
+        count_score = 50
     elif question_count <= 20:
-        # 10회 초과 시 1회당 25점씩 감점
-        count_score = 500 - ((question_count - 10) * 25)
+        # 10회 초과 시 1회당 2.5점씩 감점
+        count_score = 50 - ((question_count - 10) * 2.5)
     else:
         # 20회 초과 시 추가 감점
-        count_score = max(0, 250 - ((question_count - 20) * 50))
+        count_score = max(0, 25 - ((question_count - 20) * 5))
     
     total_score = quality_score + count_score
     
     # 등급 계산
-    if total_score >= 900:
+    if total_score >= 90:
         grade = "S"
-    elif total_score >= 800:
+    elif total_score >= 80:
         grade = "A"
-    elif total_score >= 700:
+    elif total_score >= 70:
         grade = "B"
-    elif total_score >= 600:
+    elif total_score >= 60:
         grade = "C"
     else:
         grade = "D"
@@ -571,6 +571,6 @@ def get_game_state(session_id):
     })
 
 if __name__ == '__main__':
-    port = int(os.getenv('PORT', 5000))
+    port = int(os.getenv('PORT', 5001))
     debug = os.getenv('FLASK_DEBUG', 'True') == 'True'
     app.run(host='0.0.0.0', port=port, debug=debug)
