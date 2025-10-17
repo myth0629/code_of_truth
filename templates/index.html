@@ -4,850 +4,25 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>진실의 코드 - AI 추리 게임</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Google Sans', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #1a1a1a;
-            min-height: 100vh;
-            color: #e8eaed;
-        }
-
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 0;
-        }
-
-        header {
-            padding: 24px 40px;
-            background: #202124;
-            border-bottom: 1px solid #3c4043;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .header-left {
-            display: flex;
-            align-items: center;
-            gap: 20px;
-        }
-
-        h1 {
-            font-size: 1.5em;
-            font-weight: 400;
-            color: #e8eaed;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        h1::before {
-            content: "🔍";
-            font-size: 1.2em;
-        }
-
-        .subtitle {
-            font-size: 0.9em;
-            color: #9aa0a6;
-            margin-left: 45px;
-        }
-
-        .game-area {
-            display: none;
-        }
-
-        .game-layout {
-            display: grid;
-            grid-template-columns: 400px 1fr;
-            gap: 0;
-            height: calc(100vh - 73px);
-            overflow: hidden;
-        }
-
-        .left-panel {
-            background: #202124;
-            border-right: 1px solid #3c4043;
-            overflow-y: auto;
-            padding: 20px;
-        }
-
-        .left-panel::-webkit-scrollbar {
-            width: 8px;
-        }
-
-        .left-panel::-webkit-scrollbar-track {
-            background: transparent;
-        }
-
-        .left-panel::-webkit-scrollbar-thumb {
-            background: #5f6368;
-            border-radius: 10px;
-        }
-
-        .right-panel {
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-
-        .start-screen {
-            padding: 60px 40px;
-            max-width: 1000px;
-            margin: 60px auto;
-        }
-
-        .start-screen h2 {
-            font-size: 2.5em;
-            margin-bottom: 20px;
-            color: #e8eaed;
-            font-weight: 400;
-        }
-
-        .start-hero {
-            font-size: 1.3em;
-            color: #9aa0a6;
-            margin-bottom: 40px;
-            font-weight: 300;
-        }
-
-        .start-screen p {
-            font-size: 1em;
-            line-height: 1.8;
-            margin-bottom: 30px;
-            color: #9aa0a6;
-        }
-
-        .feature-cards {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-            margin-top: 40px;
-        }
-
-        .feature-card {
-            background: #202124;
-            border: 1px solid #3c4043;
-            border-radius: 12px;
-            padding: 30px;
-            transition: all 0.3s;
-            cursor: pointer;
-        }
-
-        .feature-card:hover {
-            background: #292a2d;
-            border-color: #5f6368;
-            transform: translateY(-4px);
-        }
-
-        .feature-card-icon {
-            font-size: 2.5em;
-            margin-bottom: 15px;
-        }
-
-        .feature-card-title {
-            font-size: 1.2em;
-            color: #e8eaed;
-            margin-bottom: 10px;
-            font-weight: 500;
-        }
-
-        .feature-card-desc {
-            font-size: 0.9em;
-            color: #9aa0a6;
-            line-height: 1.6;
-        }
-
-        .btn {
-            background: #8ab4f8;
-            color: #202124;
-            border: none;
-            padding: 12px 32px;
-            font-size: 0.95em;
-            border-radius: 24px;
-            cursor: pointer;
-            transition: all 0.2s;
-            font-weight: 500;
-            font-family: inherit;
-        }
-
-        .btn:hover {
-            background: #aecbfa;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-        }
-
-        .btn:active {
-            transform: scale(0.98);
-        }
-
-        .btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .btn-outline {
-            background: transparent;
-            color: #8ab4f8;
-            border: 1px solid #5f6368;
-        }
-
-        .btn-outline:hover {
-            background: rgba(138, 180, 248, 0.08);
-            border-color: #8ab4f8;
-        }
-
-        .scenario-box {
-            background: #292a2d;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            border: 1px solid #3c4043;
-        }
-
-        .scenario-box h2 {
-            color: #f28b82;
-            margin-bottom: 12px;
-            font-size: 1.2em;
-            font-weight: 500;
-            padding-bottom: 12px;
-            border-bottom: 1px solid #3c4043;
-        }
-
-        .scenario-box p {
-            font-size: 0.9em;
-        }
-
-        .scenario-info {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            margin-top: 15px;
-        }
-
-        .info-item {
-            background: #202124;
-            padding: 12px;
-            border-radius: 6px;
-            border: 1px solid #3c4043;
-        }
-
-        .info-label {
-            font-weight: 500;
-            color: #8ab4f8;
-            margin-bottom: 5px;
-            font-size: 0.8em;
-        }
-
-        .info-item div:last-child {
-            color: #e8eaed;
-            font-size: 0.9em;
-        }
-
-        .npcs-grid {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            margin-bottom: 20px;
-        }
-
-        .npc-card {
-            background: #292a2d;
-            padding: 15px;
-            border-radius: 8px;
-            border: 1px solid #3c4043;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .npc-card:hover {
-            background: #333438;
-            border-color: #5f6368;
-        }
-
-        .npc-card.selected {
-            border-color: #8ab4f8;
-            background: rgba(138, 180, 248, 0.12);
-        }
-
-        .npc-name {
-            font-size: 1.1em;
-            font-weight: 500;
-            color: #e8eaed;
-            margin-bottom: 8px;
-        }
-
-        .npc-role {
-            color: #f28b82;
-            font-weight: 500;
-            margin-bottom: 8px;
-            font-size: 0.85em;
-        }
-
-        .npc-info {
-            color: #9aa0a6;
-            line-height: 1.5;
-            margin-bottom: 6px;
-            font-size: 0.85em;
-        }
-
-        .npc-info strong {
-            color: #8ab4f8;
-        }
-
-        .question-area {
-            display: flex;
-            flex-direction: column;
-            height: 100%;
-            background: #1a1a1a;
-        }
-
-        .chat-header {
-            padding: 20px;
-            border-bottom: 1px solid #3c4043;
-            background: #202124;
-        }
-
-        .chat-header h3 {
-            font-size: 1.2em;
-            font-weight: 400;
-            color: #e8eaed;
-            margin: 0;
-        }
-
-        .chat-body {
-            flex: 1;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            padding: 20px;
-        }
-
-        .chat-input-area {
-            display: flex;
-            gap: 10px;
-            align-items: flex-end;
-            background: #202124;
-            padding: 16px 20px;
-            border-top: 1px solid #3c4043;
-        }
-
-        .question-input {
-            flex: 1;
-            padding: 12px 15px;
-            border: none;
-            border-radius: 20px;
-            font-size: 0.95em;
-            resize: none;
-            font-family: inherit;
-            background: transparent;
-            color: #e8eaed;
-        }
-
-        .question-input::placeholder {
-            color: #5f6368;
-        }
-
-        .question-input:focus {
-            outline: none;
-        }
-
-        .btn-send {
-            padding: 10px 24px;
-            border-radius: 20px;
-            white-space: nowrap;
-            flex-shrink: 0;
-        }
-
-        .conversation-history {
-            flex: 1;
-            overflow-y: auto;
-            padding: 20px;
-            background: transparent;
-        }
-
-        .conversation-history::-webkit-scrollbar {
-            width: 8px;
-        }
-
-        .conversation-history::-webkit-scrollbar-track {
-            background: transparent;
-        }
-
-        .conversation-history::-webkit-scrollbar-thumb {
-            background: #5f6368;
-            border-radius: 10px;
-        }
-
-        .conversation-history::-webkit-scrollbar-thumb:hover {
-            background: #8ab4f8;
-        }
-
-        .npc-chat-tabs {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 15px;
-            flex-wrap: wrap;
-            border-bottom: 1px solid #3c4043;
-            padding-bottom: 10px;
-        }
-
-        .chat-tab {
-            padding: 10px 20px;
-            background: transparent;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 0.9em;
-            transition: all 0.2s;
-            position: relative;
-            color: #9aa0a6;
-            font-family: inherit;
-        }
-
-        .chat-tab:hover {
-            background: rgba(138, 180, 248, 0.08);
-            color: #e8eaed;
-        }
-
-        .chat-tab.active {
-            background: rgba(138, 180, 248, 0.16);
-            color: #8ab4f8;
-            font-weight: 500;
-        }
-
-        .chat-tab .message-count {
-            display: inline-block;
-            background: #f28b82;
-            color: #202124;
-            border-radius: 12px;
-            min-width: 20px;
-            height: 20px;
-            text-align: center;
-            line-height: 20px;
-            font-size: 0.75em;
-            margin-left: 8px;
-            padding: 0 6px;
-            font-weight: 600;
-        }
-
-        .chat-tab.active .message-count {
-            background: #8ab4f8;
-            color: #202124;
-        }
-
-        .chat-container {
-            display: none;
-            height: 100%;
-            flex-direction: column;
-        }
-
-        .chat-container.active {
-            display: flex;
-        }
-
-        .empty-chat {
-            text-align: center;
-            padding: 60px 20px;
-            color: #5f6368;
-            font-style: italic;
-            font-size: 0.95em;
-        }
-
-        .message {
-            margin-bottom: 15px;
-            animation: fadeIn 0.3s;
-            display: flex;
-            clear: both;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .message.question {
-            justify-content: flex-end;
-        }
-
-        .message.answer {
-            justify-content: flex-start;
-        }
-
-        .message-bubble {
-            max-width: 70%;
-            padding: 12px 16px;
-            border-radius: 18px;
-            position: relative;
-            word-wrap: break-word;
-        }
-
-        .message.question .message-bubble {
-            background: #8ab4f8;
-            color: #202124;
-            border-bottom-right-radius: 4px;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.3);
-        }
-
-        .message.answer .message-bubble {
-            background: #292a2d;
-            color: #e8eaed;
-            border-bottom-left-radius: 4px;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.3);
-            border: 1px solid #3c4043;
-        }
-
-        .message-header {
-            font-size: 0.85em;
-            margin-bottom: 5px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            color: #666;
-        }
-
-        .message.question .message-header {
-            justify-content: flex-end;
-        }
-
-        .message-content {
-            color: #000;
-            line-height: 1.5;
-            font-size: 0.95em;
-        }
-
-        .message-time {
-            font-size: 0.75em;
-            color: #999;
-            margin-top: 4px;
-        }
-
-        .message.question .message-time {
-            text-align: right;
-        }
-
-        .quality-badge {
-            display: inline-block;
-            padding: 3px 8px;
-            border-radius: 10px;
-            font-size: 0.75em;
-            font-weight: bold;
-            margin-left: 5px;
-        }
-
-        .quality-high {
-            background: #4caf50;
-            color: white;
-        }
-
-        .quality-medium {
-            background: #ff9800;
-            color: white;
-        }
-
-        .quality-low {
-            background: #f44336;
-            color: white;
-        }
-
-        .message-info {
-            font-size: 0.8em;
-            color: #5f6368;
-            margin-top: 8px;
-            padding-top: 8px;
-            border-top: 1px solid rgba(95, 99, 104, 0.2);
-        }
-
-        .message.answer .message-header {
-            color: #8ab4f8;
-            font-weight: 500;
-        }
-
-        .stats-bar {
-            background: #292a2d;
-            padding: 15px;
-            border-radius: 8px;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-            margin-bottom: 20px;
-            border: 1px solid #3c4043;
-        }
-
-        .stat-item {
-            text-align: center;
-            padding: 10px;
-        }
-
-        .stat-value {
-            font-size: 1.8em;
-            font-weight: 400;
-            color: #8ab4f8;
-        }
-
-        .stat-label {
-            color: #9aa0a6;
-            margin-top: 5px;
-            font-size: 0.85em;
-        }
-
-        .action-buttons {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-
-        .action-buttons .btn {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .btn-secondary {
-            background: #f28b82;
-            color: #202124;
-        }
-
-        .btn-secondary:hover {
-            background: #f6aea9;
-        }
-
-        .btn-success {
-            background: #81c995;
-            color: #202124;
-        }
-
-        .btn-success:hover {
-            background: #a8dab5;
-        }
-
-        .btn-warning {
-            background: #fdd663;
-            color: #202124;
-        }
-
-        .btn-warning:hover {
-            background: #fde293;
-        }
-
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.85);
-            z-index: 1000;
-            justify-content: center;
-            align-items: center;
-            backdrop-filter: blur(4px);
-        }
-
-        .modal-content {
-            background: #202124;
-            padding: 40px;
-            border-radius: 12px;
-            max-width: 600px;
-            text-align: center;
-            animation: scaleIn 0.3s;
-            border: 1px solid #3c4043;
-        }
-
-        @keyframes scaleIn {
-            from { transform: scale(0.95); opacity: 0; }
-            to { transform: scale(1); opacity: 1; }
-        }
-
-        .modal h2 {
-            color: #e8eaed;
-            margin-bottom: 20px;
-            font-size: 1.8em;
-            font-weight: 400;
-        }
-
-        .modal p {
-            color: #9aa0a6;
-        }
-
-        .score-display {
-            margin: 30px 0;
-        }
-
-        .score-total {
-            font-size: 4em;
-            font-weight: 400;
-            color: #8ab4f8;
-            margin-bottom: 10px;
-        }
-
-        .score-grade {
-            font-size: 3em;
-            font-weight: bold;
-            padding: 10px 30px;
-            border-radius: 50px;
-            display: inline-block;
-            margin-bottom: 20px;
-        }
-
-        .grade-S { background: #fdd663; color: #202124; }
-        .grade-A { background: #8ab4f8; color: #202124; }
-        .grade-B { background: #81c995; color: #202124; }
-        .grade-C { background: #f28b82; color: #202124; }
-        .grade-D { background: #5f6368; color: #e8eaed; }
-
-        .score-details {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 15px;
-            margin-top: 20px;
-        }
-
-        .score-detail-item {
-            background: #292a2d;
-            padding: 15px;
-            border-radius: 8px;
-            border: 1px solid #3c4043;
-        }
-
-        .score-detail-item div:first-child {
-            color: #8ab4f8;
-        }
-
-        .score-detail-item div:last-child {
-            color: #9aa0a6;
-        }
-
-        .loading {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.7);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 9999;
-            backdrop-filter: blur(4px);
-        }
-
-        .loading p {
-            color: #e8eaed;
-            margin-top: 20px;
-            font-size: 1.1em;
-        }
-
-        .spinner {
-            border: 3px solid #3c4043;
-            border-top: 3px solid #8ab4f8;
-            border-radius: 50%;
-            width: 50px;
-            height: 50px;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .evidence-list {
-            background: rgba(253, 214, 99, 0.1);
-            padding: 12px;
-            border-radius: 6px;
-            border-left: 3px solid #fdd663;
-            margin-top: 12px;
-        }
-
-        .evidence-list h3 {
-            color: #fdd663;
-            margin-bottom: 8px;
-            font-weight: 500;
-            font-size: 0.95em;
-        }
-
-        .evidence-list ul {
-            list-style-position: inside;
-            color: #9aa0a6;
-            padding-left: 0;
-        }
-
-        .evidence-list li {
-            margin-bottom: 4px;
-            font-size: 0.85em;
-        }
-
-        @media (max-width: 1024px) {
-            .game-layout {
-                grid-template-columns: 1fr;
-                height: auto;
-            }
-
-            .left-panel {
-                border-right: none;
-                border-bottom: 1px solid #3c4043;
-                max-height: 50vh;
-            }
-
-            .right-panel {
-                height: 50vh;
-            }
-        }
-
-        @media (max-width: 768px) {
-            header {
-                padding: 16px 20px;
-                flex-direction: column;
-                gap: 15px;
-            }
-
-            h1 {
-                font-size: 1.2em;
-            }
-
-            .start-screen {
-                padding: 40px 20px;
-            }
-
-            .feature-cards {
-                grid-template-columns: 1fr;
-            }
-
-            .game-layout {
-                height: auto;
-            }
-
-            .left-panel {
-                padding: 15px;
-            }
-        }
-    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
         <div class="container">
         <header>
             <div class="header-left">
-                <h1>진실의 코드</h1>
+                <h1 class="logo" onclick="location.reload()" style="cursor: pointer;">범인은 바로 너야</h1>
             </div>
             <button class="btn" onclick="startGame()" id="newGameBtn">+ 새 게임</button>
         </header>
 
         <!-- 시작 화면 -->
         <div id="startScreen" class="start-screen">
-            <h2>진실의 코드</h2>
             <div class="start-hero">AI 기반 추리 게임으로 당신의 탐정 능력을 테스트하세요</div>
-            
             <div class="feature-cards">
                 <div class="feature-card">
                     <div class="feature-card-icon">🎭</div>
-                    <div class="feature-card-title">AI 생성 시나리오</div>
-                    <div class="feature-card-desc">매번 새로운 살인 사건과 용의자들이 생성됩니다. Gemini AI가 만드는 독특한 스토리를 경험하세요.</div>
+                    <div class="feature-card-title">일일 시나리오</div>
+                    <div class="feature-card-desc">매일 자정마다 새로운 살인 사건이 생성됩니다. 오늘의 사건을 해결하고 내일의 새로운 도전을 기다리세요!</div>
                 </div>
                 
                 <div class="feature-card">
@@ -871,8 +46,50 @@
         <!-- 게임 화면 -->
         <div id="gameArea" class="game-area">
             <div class="game-layout">
-                <!-- 좌측 패널: 사건 정보 -->
+                <!-- 좌측 패널: 용의자 선택 -->
                 <div class="left-panel">
+                    <!-- NPC 카드 -->
+                    <div>
+                        <h2 style="color: #e8eaed; margin-bottom: 15px; font-weight: 500; font-size: 1.1em;">용의자</h2>
+                        <div class="npcs-grid" id="npcsGrid"></div>
+                    </div>
+
+                    <!-- 액션 버튼 -->
+                    <div class="action-buttons" style="margin-top: 20px;">
+                        <button class="btn btn-warning" onclick="getHint()">💡 힌트</button>
+                        <button class="btn btn-success" onclick="showAccuseModal()">🔍 지목</button>
+                    </div>
+                </div>
+
+                <!-- 중앙 패널: 채팅 영역 -->
+                <div class="center-panel">
+                    <div class="question-area">
+                        <div class="chat-header">
+                            <h3>대화</h3>
+                        </div>
+
+                        <div class="chat-body">
+                            <!-- 대화 기록 탭 -->
+                            <div class="npc-chat-tabs" id="chatTabs"></div>
+                            
+                            <!-- 각 NPC별 대화창 -->
+                            <div id="chatContainers" style="flex: 1; overflow: hidden;"></div>
+                        </div>
+
+                        <!-- 채팅 입력창 (하단) -->
+                        <div class="chat-input-area">
+                            <textarea 
+                                class="question-input" 
+                                id="questionInput" 
+                                rows="2" 
+                                placeholder="메시지를 입력하세요..."></textarea>
+                            <button class="btn btn-send" onclick="askQuestion()">전송</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 우측 패널: 사건 정보 -->
+                <div class="right-panel">
                     <!-- 통계 -->
                     <div class="stats-bar">
                         <div class="stat-item">
@@ -887,6 +104,9 @@
 
                     <!-- 시나리오 정보 -->
                     <div class="scenario-box">
+                        <div style="background: rgba(138, 180, 248, 0.1); padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; font-size: 0.85em; color: #8ab4f8; text-align: center;">
+                            📅 오늘의 사건 (<span id="dailyDate"></span>)
+                        </div>
                         <h2 id="scenarioTitle">사건 발생</h2>
                         <p id="scenarioDesc" style="color: #9aa0a6; line-height: 1.6;"></p>
                         
@@ -910,48 +130,9 @@
                             <ul id="evidenceList"></ul>
                         </div>
                     </div>
-
-                    <!-- NPC 카드 -->
-                    <div style="margin-top: 20px;">
-                        <h2 style="color: #e8eaed; margin-bottom: 15px; font-weight: 500; font-size: 1.1em;">용의자</h2>
-                        <div class="npcs-grid" id="npcsGrid"></div>
-                    </div>
-
-                    <!-- 액션 버튼 -->
-                    <div class="action-buttons" style="margin-top: 20px;">
-                        <button class="btn btn-warning" onclick="getHint()">💡 힌트</button>
-                        <button class="btn btn-success" onclick="showAccuseModal()">🔍 지목</button>
-                    </div>
-                </div>
-
-                <!-- 우측 패널: 채팅 영역 -->
-                <div class="right-panel">
-                    <div class="question-area">
-
-                <div class="chat-header">
-                    <h3>대화</h3>
-                </div>
-
-                <div class="chat-body">
-                    <!-- 대화 기록 탭 -->
-                    <div class="npc-chat-tabs" id="chatTabs"></div>
-                    
-                    <!-- 각 NPC별 대화창 -->
-                    <div id="chatContainers" style="flex: 1; overflow: hidden;"></div>
-                </div>
-
-                <!-- 채팅 입력창 (하단) -->
-                <div class="chat-input-area">
-                    <textarea 
-                        class="question-input" 
-                        id="questionInput" 
-                        rows="2" 
-                        placeholder="메시지를 입력하세요..."></textarea>
-                    <button class="btn btn-send" onclick="askQuestion()">전송</button>
                 </div>
             </div>
-        </div>  
-    </div>
+        </div>
 
         <!-- 로딩 -->
         <div id="loading" class="loading" style="display: none;">
@@ -1002,6 +183,11 @@
                     sessionId = result.data.session_id;
                     npcs = result.data.npcs;
                     
+                    // 오늘 날짜 표시
+                    const today = new Date();
+                    const dateStr = `${today.getFullYear()}년 ${today.getMonth() + 1}월 ${today.getDate()}일`;
+                    document.getElementById('dailyDate').textContent = dateStr;
+                    
                     // 시나리오 표시
                     document.getElementById('scenarioTitle').textContent = result.data.title;
                     document.getElementById('scenarioDesc').textContent = result.data.scenario;
@@ -1044,6 +230,9 @@
                     // 화면 전환
                     document.getElementById('startScreen').style.display = 'none';
                     document.getElementById('gameArea').style.display = 'block';
+                    
+                    // 키보드 리스너 설정
+                    setupKeydownListener();
                 } else {
                     alert('게임 시작 실패: ' + result.error);
                 }
@@ -1132,7 +321,13 @@
             switchChat(npcName);
         }
 
+        let isProcessing = false; // 중복 요청 방지
+
         async function askQuestion() {
+            if (isProcessing) {
+                return; // 이미 처리 중이면 무시
+            }
+            
             if (!selectedNpc) {
                 alert('먼저 NPC를 선택하세요.');
                 return;
@@ -1144,7 +339,22 @@
                 return;
             }
             
-            showLoading(true);
+            isProcessing = true;
+            
+            // 입력창 초기화
+            document.getElementById('questionInput').value = '';
+            
+            // 질문을 먼저 화면에 표시
+            npcConversations[selectedNpc].push({
+                type: 'question',
+                content: question,
+                score: null,
+                reasoning: null
+            });
+            updateChatDisplay(selectedNpc);
+            
+            // 입력중 표시 추가
+            showTypingIndicator(selectedNpc);
             
             try {
                 const response = await fetch('/ask', {
@@ -1159,15 +369,18 @@
                 
                 const result = await response.json();
                 
+                // 입력중 표시 제거
+                hideTypingIndicator(selectedNpc);
+                
                 if (result.success) {
-                    // 질문과 답변을 해당 NPC의 대화 배열에 저장
-                    npcConversations[selectedNpc].push({
-                        type: 'question',
-                        content: question,
-                        score: result.data.quality_score,
-                        reasoning: result.data.reasoning
-                    });
+                    // 마지막 질문 업데이트 (점수와 이유 추가)
+                    const lastQuestion = npcConversations[selectedNpc][npcConversations[selectedNpc].length - 1];
+                    if (lastQuestion && lastQuestion.type === 'question') {
+                        lastQuestion.score = result.data.quality_score;
+                        lastQuestion.reasoning = result.data.reasoning;
+                    }
                     
+                    // 답변 추가
                     npcConversations[selectedNpc].push({
                         type: 'answer',
                         content: result.data.answer
@@ -1181,16 +394,58 @@
                     
                     // 통계 업데이트
                     updateStats(result.data);
-                    
-                    // 입력창 초기화
-                    document.getElementById('questionInput').value = '';
                 } else {
+                    // 실패 시 질문 제거
+                    npcConversations[selectedNpc].pop();
+                    updateChatDisplay(selectedNpc);
                     alert('질문 실패: ' + result.error);
                 }
             } catch (error) {
+                // 오류 시 질문 제거
+                hideTypingIndicator(selectedNpc);
+                npcConversations[selectedNpc].pop();
+                updateChatDisplay(selectedNpc);
                 alert('오류 발생: ' + error.message);
             } finally {
-                showLoading(false);
+                isProcessing = false; // 처리 완료
+            }
+        }
+
+        function showTypingIndicator(npcName) {
+            const chatContainer = document.getElementById(`chat-${npcName}`);
+            if (!chatContainer) return;
+            
+            const historyDiv = chatContainer.querySelector('.conversation-history');
+            if (!historyDiv) return;
+            
+            // 기존 입력중 표시 제거
+            const existing = historyDiv.querySelector('.typing-indicator');
+            if (existing) existing.remove();
+            
+            // 입력중 표시 추가
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'typing-indicator';
+            typingDiv.innerHTML = `
+                <div class="typing-bubble">
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                </div>
+            `;
+            historyDiv.appendChild(typingDiv);
+            historyDiv.scrollTop = historyDiv.scrollHeight;
+        }
+
+        function hideTypingIndicator(npcName) {
+            const chatContainer = document.getElementById(`chat-${npcName}`);
+            if (!chatContainer) return;
+            
+            const historyDiv = chatContainer.querySelector('.conversation-history');
+            if (!historyDiv) return;
+            
+            const typingDiv = historyDiv.querySelector('.typing-indicator');
+            if (typingDiv) {
+                typingDiv.remove();
             }
         }
 
@@ -1302,7 +557,10 @@
                         updateChatDisplay(activeChat);
                         updateMessageCount(activeChat);
                     }
-                    alert(result.data.penalty);
+                    
+                    // 힌트 남은 횟수 표시
+                    const hintsRemaining = result.data.hints_remaining || 0;
+                    alert(`${result.data.penalty}\n남은 힌트: ${hintsRemaining}회`);
                 } else {
                     alert('힌트 요청 실패: ' + result.error);
                 }
@@ -1371,9 +629,28 @@
             
             if (isCorrect) {
                 const score = data.score;
+                const culpritInfo = data.culprit_info;
+                
                 title.textContent = '🎉 사건 해결!';
+                
+                let culpritSection = '';
+                if (culpritInfo) {
+                    culpritSection = `
+                        <div style="background: rgba(242, 139, 130, 0.1); padding: 20px; border-radius: 12px; margin: 20px 0; border: 1px solid rgba(242, 139, 130, 0.3);">
+                            <h3 style="color: #f28b82; margin-bottom: 15px; font-size: 1.3em;">🔍 범행 진실</h3>
+                            <div style="text-align: left; color: #9aa0a6; line-height: 1.8;">
+                                <p style="margin-bottom: 10px;"><strong style="color: #8ab4f8;">범인:</strong> ${culpritInfo.name}</p>
+                                <p style="margin-bottom: 10px;"><strong style="color: #8ab4f8;">동기 및 진실:</strong></p>
+                                <p style="padding-left: 15px; color: #e8eaed;">${culpritInfo.secret}</p>
+                            </div>
+                        </div>
+                    `;
+                }
+                
                 content.innerHTML = `
                     <p style="font-size: 1.2em; margin-bottom: 20px;">${data.message}</p>
+                    
+                    ${culpritSection}
                     
                     <div class="score-display">
                         <div class="score-grade grade-${score.grade}">${score.grade} 등급</div>
@@ -1381,20 +658,20 @@
                         
                         <div class="score-details">
                             <div class="score-detail-item">
-                                <div style="font-size: 1.5em; font-weight: bold; color: #667eea;">${score.quality_score}</div>
-                                <div style="color: #666;">질문 품질 점수</div>
+                                <div style="font-size: 1.5em; font-weight: bold; color: #8ab4f8;">${score.quality_score}</div>
+                                <div style="color: #9aa0a6;">질문 품질 점수</div>
                             </div>
                             <div class="score-detail-item">
-                                <div style="font-size: 1.5em; font-weight: bold; color: #667eea;">${score.count_score}</div>
-                                <div style="color: #666;">효율성 점수</div>
+                                <div style="font-size: 1.5em; font-weight: bold; color: #8ab4f8;">${score.count_score}</div>
+                                <div style="color: #9aa0a6;">효율성 점수</div>
                             </div>
                             <div class="score-detail-item">
-                                <div style="font-size: 1.5em; font-weight: bold; color: #667eea;">${score.question_count}</div>
-                                <div style="color: #666;">총 질문 횟수</div>
+                                <div style="font-size: 1.5em; font-weight: bold; color: #8ab4f8;">${score.question_count}</div>
+                                <div style="color: #9aa0a6;">총 질문 횟수</div>
                             </div>
                             <div class="score-detail-item">
-                                <div style="font-size: 1.5em; font-weight: bold; color: #667eea;">${score.avg_quality}</div>
-                                <div style="color: #666;">평균 질문 점수</div>
+                                <div style="font-size: 1.5em; font-weight: bold; color: #8ab4f8;">${score.avg_quality}</div>
+                                <div style="color: #9aa0a6;">평균 질문 점수</div>
                             </div>
                         </div>
                     </div>
@@ -1408,8 +685,12 @@
             document.getElementById('loading').style.display = show ? 'block' : 'none';
         }
 
-        // Enter 키로 질문 전송
-        document.addEventListener('DOMContentLoaded', function() {
+        // Enter 키로 질문 전송 (중복 등록 방지)
+        let keydownListenerAdded = false;
+        
+        function setupKeydownListener() {
+            if (keydownListenerAdded) return;
+            
             const input = document.getElementById('questionInput');
             if (input) {
                 input.addEventListener('keydown', function(e) {
@@ -1418,8 +699,11 @@
                         askQuestion();
                     }
                 });
+                keydownListenerAdded = true;
             }
-        });
+        }
+
+        document.addEventListener('DOMContentLoaded', setupKeydownListener);
     </script>
 </body>
 </html>

@@ -1,10 +1,26 @@
 import os
 import json
 import uuid
-from datetime import datetime
+import logging
+from datetime import datetime, timedelta
+from threading import Timer
 from flask import Flask, render_template, request, jsonify, session
 from dotenv import load_dotenv
 import google.generativeai as genai
+
+# 프롬프트 모듈 import
+from prompts import (
+    SCENARIO_GENERATION_PROMPT,
+    DEFAULT_SCENARIO,
+    format_question_evaluation_prompt,
+    format_npc_response_prompt,
+    format_hint_generation_prompt,
+    build_conversation_history
+)
+
+# 로깅 설정
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # 환경 변수 로드
 load_dotenv()
@@ -12,6 +28,12 @@ load_dotenv()
 # Flask 앱 초기화
 app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev-secret-key-change-in-production')
+
+# 게임 설정 상수
+MAX_QUESTIONS = 50  # 최대 질문 횟수
+MAX_HINTS = 3  # 최대 힌트 횟수
+GAME_CLEANUP_INTERVAL = 600  # 정리 간격 (초) - 10분
+GAME_RETENTION_TIME = 3600  # 게임 보관 시간 (초) - 1시간
 
 # Gemini API 설정
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
@@ -24,130 +46,91 @@ genai.configure(api_key=GEMINI_API_KEY)
 games = {}
 
 # Gemini 모델 설정
-model = genai.GenerativeModel('gemini-2.0-flash-exp')
+model = genai.GenerativeModel('gemini-2.5-flash-exp')
+
+def cleanup_old_games():
+    """오래된 게임 세션을 정리합니다."""
+    try:
+        now = datetime.now()
+        to_delete = []
+        
+        for session_id, game in games.items():
+            # 종료된 게임만 정리
+            if game.get('is_finished'):
+                end_time_str = game.get('end_time', game.get('start_time'))
+                if end_time_str:
+                    try:
+                        end_time = datetime.fromisoformat(end_time_str)
+                        # 종료 후 GAME_RETENTION_TIME(1시간)이 지나면 삭제
+                        if (now - end_time).total_seconds() > GAME_RETENTION_TIME:
+                            to_delete.append(session_id)
+                    except (ValueError, TypeError) as e:
+                        logger.warning(f"게임 세션 {session_id}의 시간 파싱 실패: {e}")
+        
+        # 삭제 실행
+        for session_id in to_delete:
+            del games[session_id]
+            logger.info(f"게임 세션 {session_id} 정리 완료")
+        
+        if to_delete:
+            logger.info(f"{len(to_delete)}개의 오래된 게임 세션을 정리했습니다. 현재 활성 세션: {len(games)}개")
+        
+    except Exception as e:
+        logger.error(f"게임 세션 정리 중 오류: {e}", exc_info=True)
+    finally:
+        # 다음 정리 스케줄
+        Timer(GAME_CLEANUP_INTERVAL, cleanup_old_games).start()
+
+# 앱 시작 시 정리 작업 시작
+cleanup_old_games()
 
 def generate_scenario():
     """LLM을 사용하여 살인 사건 시나리오를 생성합니다."""
-    prompt = """
-당신은 추리 게임의 시나리오 작가입니다. 흥미진진한 살인 사건 시나리오를 생성해주세요.
-
-다음 형식의 JSON으로 응답해주세요:
-
-{
-    "title": "사건의 제목",
-    "scenario": "사건의 배경 및 상황 설명 (200자 이내)",
-    "victim": "피해자 이름",
-    "location": "사건 발생 장소",
-    "time": "사건 발생 시간",
-    "culprit": "실제 범인의 이름",
-    "npcs": [
-        {
-            "name": "NPC 이름",
-            "role": "역할 (예: 용의자, 목격자)",
-            "personality": "성격 설명",
-            "secret": "숨기고 있는 진실 또는 거짓말",
-            "alibi": "알리바이",
-            "relationship": "피해자와의 관계"
-        },
-        // 3명의 NPC (범인 포함)
-    ],
-    "key_evidence": ["증거1", "증거2", "증거3"]
-}
-
-중요: 반드시 유효한 JSON 형식으로만 응답하세요. 다른 설명은 추가하지 마세요.
-범인은 3명의 NPC 중 한 명이어야 합니다.
-각 NPC는 각자의 비밀과 동기가 있어야 하며, 범인이 아닌 NPC도 의심스러운 행동이나 비밀이 있어야 합니다.
-"""
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            response = model.generate_content(SCENARIO_GENERATION_PROMPT)
+            # JSON 파싱
+            text = response.text.strip()
+            
+            # 마크다운 코드 블록 제거
+            if text.startswith('```json'):
+                text = text[7:]
+            elif text.startswith('```'):
+                text = text[3:]
+            if text.endswith('```'):
+                text = text[:-3]
+            
+            text = text.strip()
+            scenario_data = json.loads(text)
+            
+            # 범인이 NPC 목록에 있는지 확인
+            npc_names = [npc['name'] for npc in scenario_data['npcs']]
+            if scenario_data['culprit'] not in npc_names:
+                # 범인이 NPC 목록에 없으면 첫 번째 NPC를 범인으로 설정
+                scenario_data['culprit'] = npc_names[0]
+            
+            logging.info(f"시나리오 생성 성공 (시도 {attempt + 1}/{max_retries})")
+            return scenario_data
+            
+        except json.JSONDecodeError as e:
+            logging.warning(f"시나리오 JSON 파싱 실패 (시도 {attempt + 1}/{max_retries}): {str(e)}")
+            if attempt == max_retries - 1:
+                logging.error("시나리오 생성 최대 재시도 횟수 초과, 기본 시나리오 사용")
+            continue
+        except Exception as e:
+            logging.error(f"시나리오 생성 오류 (시도 {attempt + 1}/{max_retries}): {str(e)}")
+            if attempt == max_retries - 1:
+                logging.error("시나리오 생성 실패, 기본 시나리오 사용")
+            continue
     
-    try:
-        response = model.generate_content(prompt)
-        # JSON 파싱
-        text = response.text.strip()
-        
-        # 마크다운 코드 블록 제거
-        if text.startswith('```json'):
-            text = text[7:]
-        elif text.startswith('```'):
-            text = text[3:]
-        if text.endswith('```'):
-            text = text[:-3]
-        
-        text = text.strip()
-        scenario_data = json.loads(text)
-        
-        # 범인이 NPC 목록에 있는지 확인
-        npc_names = [npc['name'] for npc in scenario_data['npcs']]
-        if scenario_data['culprit'] not in npc_names:
-            # 범인이 NPC 목록에 없으면 첫 번째 NPC를 범인으로 설정
-            scenario_data['culprit'] = npc_names[0]
-        
-        return scenario_data
-    except Exception as e:
-        print(f"시나리오 생성 오류: {e}")
-        # 기본 시나리오 반환
-        return {
-            "title": "저택의 비밀",
-            "scenario": "유명 사업가가 자신의 저택에서 살해당했습니다. 사건 당시 저택에는 3명이 있었습니다.",
-            "victim": "김재벌",
-            "location": "강남구 고급 저택",
-            "time": "2025년 10월 15일 밤 11시",
-            "culprit": "이비서",
-            "npcs": [
-                {
-                    "name": "이비서",
-                    "role": "용의자",
-                    "personality": "냉정하고 계산적",
-                    "secret": "피해자가 횡령 증거를 발견했고, 이를 숨기기 위해 살해했다",
-                    "alibi": "서재에서 업무를 보고 있었다고 주장",
-                    "relationship": "10년간 비서로 근무"
-                },
-                {
-                    "name": "박자녀",
-                    "role": "용의자",
-                    "personality": "감정적이고 충동적",
-                    "secret": "아버지와 유산 문제로 큰 다툼이 있었다",
-                    "alibi": "자신의 방에서 음악을 듣고 있었다고 주장",
-                    "relationship": "피해자의 딸"
-                },
-                {
-                    "name": "최요리사",
-                    "role": "목격자",
-                    "personality": "소심하고 관찰력이 좋음",
-                    "secret": "주방에서 이비서가 서재로 들어가는 것을 목격했지만 두려워서 말하지 못하고 있다",
-                    "alibi": "주방에서 다음 날 식사를 준비하고 있었다",
-                    "relationship": "5년간 요리사로 근무"
-                }
-            ],
-            "key_evidence": [
-                "서재 문손잡이에서 발견된 지문",
-                "피해자의 노트북에 남겨진 횡령 증거",
-                "CCTV에 찍힌 복도의 그림자"
-            ]
-        }
+    # 모든 재시도 실패 시 기본 시나리오 반환
+    logging.warning("기본 시나리오 사용")
+    return DEFAULT_SCENARIO
 
 def evaluate_question_quality(question, scenario_context):
     """질문의 품질을 1-100점으로 평가합니다."""
-    prompt = f"""
-당신은 추리 게임의 질문 품질 평가자입니다.
-
-사건 정보:
-{scenario_context}
-
-플레이어의 질문: "{question}"
-
-이 질문을 다음 기준으로 평가하세요:
-1. 논리성 (30점): 질문이 논리적이고 추리에 도움이 되는가?
-2. 구체성 (30점): 질문이 구체적이고 명확한가?
-3. 효율성 (40점): 질문이 사건 해결에 직접적으로 기여할 수 있는가?
-
-총 100점 만점으로 평가하고, 다음 JSON 형식으로만 응답하세요:
-{{
-    "score": 숫자 (1-100),
-    "reasoning": "평가 이유 (한 문장)"
-}}
-
-중요: 반드시 유효한 JSON 형식으로만 응답하세요.
-"""
+    prompt = format_question_evaluation_prompt(question, scenario_context)
     
     try:
         response = model.generate_content(prompt)
@@ -178,44 +161,9 @@ def generate_npc_response(question, npc_info, scenario, previous_questions):
     """NPC의 응답을 생성합니다. NPC는 자신의 비밀을 숨기려고 합니다."""
     
     # 이전 대화 컨텍스트 구성
-    conversation_history = ""
-    if previous_questions:
-        conversation_history = "\n이전 질문들:\n"
-        for i, q in enumerate(previous_questions[-5:], 1):  # 최근 5개만
-            conversation_history += f"{i}. Q: {q['question']}\n   A: {q['answer']}\n"
+    conversation_history = build_conversation_history(previous_questions, max_items=5)
     
-    prompt = f"""
-당신은 추리 게임의 NPC '{npc_info['name']}'입니다.
-
-사건 정보:
-- 제목: {scenario['title']}
-- 상황: {scenario['scenario']}
-- 피해자: {scenario['victim']}
-- 장소: {scenario['location']}
-- 시간: {scenario['time']}
-
-당신의 정보:
-- 이름: {npc_info['name']}
-- 역할: {npc_info['role']}
-- 성격: {npc_info['personality']}
-- 비밀: {npc_info['secret']}
-- 알리바이: {npc_info['alibi']}
-- 피해자와의 관계: {npc_info['relationship']}
-
-{conversation_history}
-
-수사관의 질문: "{question}"
-
-역할 연기 규칙:
-1. 당신의 성격에 맞게 대답하세요
-2. 비밀을 직접적으로 드러내지 마세요 (단, 날카로운 질문에는 힌트를 줄 수 있습니다)
-3. 자연스럽고 사실적인 대화체로 답변하세요
-4. 100자 이내로 답변하세요
-5. 방어적이거나 회피적인 태도를 보일 수 있습니다
-6. 진실과 거짓을 섞어서 답변하세요
-
-답변만 작성하세요 (다른 설명 없이):
-"""
+    prompt = format_npc_response_prompt(question, npc_info, scenario, conversation_history)
     
     try:
         response = model.generate_content(prompt)
@@ -287,6 +235,7 @@ def start_game():
             'culprit': scenario['culprit'],
             'npcs': scenario['npcs'],
             'questions': [],  # {npc_name, question, answer, quality_score, reasoning}
+            'hints_used': 0,  # 사용한 힌트 횟수
             'start_time': datetime.now().isoformat(),
             'is_finished': False
         }
@@ -316,10 +265,17 @@ def start_game():
             'data': public_scenario
         })
     
-    except Exception as e:
+    except ValueError as e:
+        logging.error(f"게임 시작 중 잘못된 값: {str(e)}")
         return jsonify({
             'success': False,
-            'error': str(e)
+            'error': '게임 시작 중 오류가 발생했습니다.'
+        }), 500
+    except Exception as e:
+        logging.error(f"게임 시작 중 오류: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': '게임을 시작할 수 없습니다. 잠시 후 다시 시도해주세요.'
         }), 500
 
 @app.route('/ask', methods=['POST'])
@@ -351,6 +307,14 @@ def ask_question():
             return jsonify({
                 'success': False,
                 'error': '이미 종료된 게임입니다.'
+            }), 400
+        
+        # 질문 횟수 제한 체크
+        if len(game['questions']) >= MAX_QUESTIONS:
+            logging.warning(f"세션 {session_id}: 최대 질문 횟수({MAX_QUESTIONS})에 도달했습니다.")
+            return jsonify({
+                'success': False,
+                'error': f'최대 질문 횟수({MAX_QUESTIONS}회)에 도달했습니다. 이제 범인을 지목해주세요.'
             }), 400
         
         # NPC 찾기
@@ -399,10 +363,23 @@ def ask_question():
             }
         })
     
-    except Exception as e:
+    except ValueError as e:
+        logging.error(f"세션 {session_id}: 잘못된 입력 값 - {str(e)}")
         return jsonify({
             'success': False,
-            'error': str(e)
+            'error': '입력 값이 올바르지 않습니다.'
+        }), 400
+    except KeyError as e:
+        logging.error(f"세션 {session_id}: 필수 키 누락 - {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': '필수 정보가 누락되었습니다.'
+        }), 400
+    except Exception as e:
+        logging.error(f"세션 {session_id if 'session_id' in locals() else 'unknown'}: /ask 처리 중 오류 - {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': '질문 처리 중 오류가 발생했습니다.'
         }), 500
 
 @app.route('/accuse', methods=['POST'])
@@ -476,10 +453,23 @@ def accuse_culprit():
                 }
             })
     
-    except Exception as e:
+    except ValueError as e:
+        logging.error(f"세션 {session_id}: 범인 지목 중 잘못된 값 - {str(e)}")
         return jsonify({
             'success': False,
-            'error': str(e)
+            'error': '입력 값이 올바르지 않습니다.'
+        }), 400
+    except KeyError as e:
+        logging.error(f"세션 {session_id}: 필수 키 누락 - {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': '필수 정보가 누락되었습니다.'
+        }), 400
+    except Exception as e:
+        logging.error(f"세션 {session_id if 'session_id' in locals() else 'unknown'}: /accuse 처리 중 오류 - {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': '범인 지목 처리 중 오류가 발생했습니다.'
         }), 500
 
 @app.route('/hint', methods=['POST'])
@@ -503,15 +493,19 @@ def get_hint():
         
         game = games[session_id]
         
+        # 힌트 횟수 제한 체크
+        if game['hints_used'] >= MAX_HINTS:
+            logging.warning(f"세션 {session_id}: 최대 힌트 횟수({MAX_HINTS})에 도달했습니다.")
+            return jsonify({
+                'success': False,
+                'error': f'최대 힌트 횟수({MAX_HINTS}회)에 도달했습니다. 더 이상 힌트를 받을 수 없습니다.'
+            }), 400
+        
         # 힌트 생성
-        prompt = f"""
-사건 정보:
-{game['scenario']['scenario']}
-범인: {game['culprit']}
-
-플레이어에게 줄 힌트를 작성하세요. 범인을 직접적으로 밝히지 말고, 추리의 방향을 제시하는 간접적인 힌트를 주세요.
-50자 이내로 작성하세요.
-"""
+        prompt = format_hint_generation_prompt(
+            game['scenario']['scenario'],
+            game['culprit']
+        )
         
         response = model.generate_content(prompt)
         hint = response.text.strip()
@@ -526,19 +520,30 @@ def get_hint():
             'timestamp': datetime.now().isoformat()
         }
         game['questions'].append(hint_record)
+        game['hints_used'] += 1  # 힌트 사용 횟수 증가
+        
+        logging.info(f"세션 {session_id}: 힌트 제공 ({game['hints_used']}/{MAX_HINTS})")
         
         return jsonify({
             'success': True,
             'data': {
                 'hint': hint,
-                'penalty': '힌트 사용으로 평균 점수가 낮아집니다.'
+                'penalty': '힌트 사용으로 평균 점수가 낮아집니다.',
+                'hints_remaining': MAX_HINTS - game['hints_used']
             }
         })
     
-    except Exception as e:
+    except ValueError as e:
+        logging.error(f"세션 {session_id}: 힌트 생성 중 잘못된 값 - {str(e)}")
         return jsonify({
             'success': False,
-            'error': str(e)
+            'error': '힌트 생성 중 오류가 발생했습니다.'
+        }), 500
+    except Exception as e:
+        logging.error(f"세션 {session_id if 'session_id' in locals() else 'unknown'}: /hint 처리 중 오류 - {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': '힌트 요청 처리 중 오류가 발생했습니다.'
         }), 500
 
 @app.route('/game/<session_id>', methods=['GET'])
