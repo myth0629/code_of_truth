@@ -1,10 +1,10 @@
-# 🔍 진실의 코드 (Truth Code)
+# 🔍 범인은 바로 너야
 
-AI 기반 웹 추리 게임 - LLM이 생성한 살인 사건의 진실을 파헤치세요!
+AI 기반 웹 추리 게임 - AI가 생성한 살인 사건의 진실을 파헤치세요!
 
 ## 📖 게임 소개
 
-**진실의 코드**는 플레이어가 수사관이 되어 AI가 생성한 살인 사건의 진실을 밝혀내는 추리 게임입니다.
+**플레이어가 수사관이 되어 AI가 생성한 살인 사건의 진실을 밝혀내는 추리 게임입니다.
 
 ### 🎮 핵심 플레이 방식
 
@@ -12,7 +12,7 @@ AI 기반 웹 추리 게임 - LLM이 생성한 살인 사건의 진실을 파헤
 - **숨겨진 비밀**: 각 NPC는 자신만의 '핵심 거짓말'을 가지고 있으며, 진실을 은폐하려고 합니다
 - **AI 생성 시나리오**: 매번 새로운 살인 사건 시나리오가 자동으로 생성됩니다
 
-### 🧠 혁신적인 점수 시스템
+### 🧠 점수 시스템
 
 단순히 범인을 맞추는 것을 넘어, 추리 효율성을 평가합니다:
 
@@ -27,66 +27,6 @@ AI 기반 웹 추리 게임 - LLM이 생성한 살인 사건의 진실을 파헤
 - **AI 모델**: Google Gemini 2.0 Flash (gemini-2.0-flash-exp)
 - **프론트엔드**: HTML5, CSS3, JavaScript (Vanilla)
 - **데이터 저장**: 인메모리 Dictionary (확장 가능)
-
-## 📋 사전 요구사항
-
-- Python 3.8 이상
-- Google Gemini API Key ([발급받기](https://aistudio.google.com/app/apikey))
-
-## 🚀 설치 및 실행
-
-### 1. 저장소 클론 (또는 파일 다운로드)
-
-```bash
-cd /Users/macbook/Desktop/workspace/ai/Game
-```
-
-### 2. 가상환경 생성 및 활성화
-
-```bash
-# 가상환경 생성
-python3 -m venv venv
-
-# 가상환경 활성화 (macOS/Linux)
-source venv/bin/activate
-
-# 가상환경 활성화 (Windows)
-# venv\Scripts\activate
-```
-
-### 3. 의존성 패키지 설치
-
-```bash
-pip install -r requirements.txt
-```
-
-### 4. 환경 변수 설정
-
-`.env.example` 파일을 복사하여 `.env` 파일을 생성하고, API 키를 설정합니다:
-
-```bash
-cp .env.example .env
-```
-
-`.env` 파일을 열어 다음 내용을 수정하세요:
-
-```env
-GEMINI_API_KEY=your_actual_api_key_here
-FLASK_SECRET_KEY=your_secret_key_here
-FLASK_DEBUG=True
-```
-
-### 5. 애플리케이션 실행
-
-```bash
-python app.py
-```
-
-### 6. 브라우저에서 접속
-
-```
-http://localhost:5000
-```
 
 ## 🎯 게임 플레이 방법
 
@@ -155,20 +95,6 @@ http://localhost:5000
 - 구체성 (30점): 질문이 구체적이고 명확한가?
 - 효율성 (40점): 질문이 사건 해결에 직접적으로 기여하는가?
 
-## 📁 프로젝트 구조
-
-```
-Game/
-├── app.py                 # Flask 메인 애플리케이션
-├── requirements.txt       # Python 의존성 패키지
-├── .env.example          # 환경 변수 템플릿
-├── .gitignore            # Git 제외 파일
-├── README.md             # 프로젝트 문서
-├── templates/
-│   └── index.html        # 게임 UI 템플릿
-└── static/               # 정적 파일 (필요시 추가)
-```
-
 ## 🎨 UI 특징
 
 - **반응형 디자인**: 모바일, 태블릿, 데스크톱 모두 지원
@@ -188,35 +114,6 @@ Game/
 - [ ] 사용자 계정 시스템 및 리더보드
 - [ ] 난이도 선택 (쉬움, 보통, 어려움)
 - [ ] 더 다양한 사건 테마 (강도, 사기, 납치 등)
-- [ ] 멀티플레이어 협동 모드
-- [ ] 음성 인식 질문 입력
-- [ ] 이미지 생성으로 NPC 프로필 사진 추가
-
-## 🐛 문제 해결
-
-### Gemini API 오류
-- API 키가 올바른지 확인하세요
-- 할당량 초과 여부를 확인하세요 ([콘솔](https://aistudio.google.com/))
-
-### Flask 실행 오류
-- 가상환경이 활성화되었는지 확인하세요
-- 의존성 패키지가 모두 설치되었는지 확인하세요: `pip list`
-
-### 포트 충돌
-- 5000번 포트가 이미 사용 중이라면 `.env` 파일에 `PORT=8000` 등으로 변경하세요
-
-## 📝 라이선스
-
-이 프로젝트는 교육 및 포트폴리오 목적으로 제작되었습니다.
-
-## 👨‍💻 개발자
-
-게임 기획 및 개발 by GitHub Copilot
-
-## 🙏 감사의 말
-
-- Google Gemini API를 제공해주신 Google에 감사드립니다
-- Flask 프레임워크 개발자분들께 감사드립니다
 
 ---
 
