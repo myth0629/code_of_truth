@@ -8,6 +8,9 @@ from flask import Flask, render_template, request, jsonify, session
 from dotenv import load_dotenv
 import google.generativeai as genai
 
+# 데이터베이스 모듈 import
+import database as db
+
 # 프롬프트 모듈 import
 from prompts import (
     SCENARIO_GENERATION_PROMPT,
@@ -42,38 +45,49 @@ if not GEMINI_API_KEY:
 
 genai.configure(api_key=GEMINI_API_KEY)
 
-# 게임 세션 저장소 (인메모리)
+# 게임 세션 저장소 (활성 세션만 인메모리)
 games = {}
 
 # Gemini 모델 설정
-model = genai.GenerativeModel('gemini-2.5-flash-exp')
+model = genai.GenerativeModel('gemini-2.5-flash')
+
+# 데이터베이스 초기화
+db.init_db()
 
 def cleanup_old_games():
-    """오래된 게임 세션을 정리합니다."""
+    """오래된 게임 세션 및 DB 데이터를 정리합니다."""
     try:
         now = datetime.now()
         to_delete = []
         
+        # 인메모리 게임 세션 정리
         for session_id, game in games.items():
-            # 종료된 게임만 정리
             if game.get('is_finished'):
                 end_time_str = game.get('end_time', game.get('start_time'))
                 if end_time_str:
                     try:
                         end_time = datetime.fromisoformat(end_time_str)
-                        # 종료 후 GAME_RETENTION_TIME(1시간)이 지나면 삭제
                         if (now - end_time).total_seconds() > GAME_RETENTION_TIME:
                             to_delete.append(session_id)
                     except (ValueError, TypeError) as e:
                         logger.warning(f"게임 세션 {session_id}의 시간 파싱 실패: {e}")
         
-        # 삭제 실행
         for session_id in to_delete:
             del games[session_id]
-            logger.info(f"게임 세션 {session_id} 정리 완료")
+            logger.info(f"인메모리 게임 세션 {session_id} 정리 완료")
         
         if to_delete:
-            logger.info(f"{len(to_delete)}개의 오래된 게임 세션을 정리했습니다. 현재 활성 세션: {len(games)}개")
+            logger.info(f"{len(to_delete)}개의 활성 세션을 정리했습니다. 현재 활성 세션: {len(games)}개")
+        
+        # DB 오래된 세션 정리 (24시간 이상 된 완료 세션)
+        deleted_sessions = db.delete_old_sessions(hours=24)
+        if deleted_sessions > 0:
+            logger.info(f"DB에서 {deleted_sessions}개의 오래된 세션 삭제")
+        
+        # DB 오래된 시나리오 정리 (30일 이상)
+        deleted_scenarios = db.delete_old_scenarios(days=30)
+        if deleted_scenarios > 0:
+            logger.info(f"DB에서 {deleted_scenarios}개의 오래된 시나리오 삭제")
         
     except Exception as e:
         logger.error(f"게임 세션 정리 중 오류: {e}", exc_info=True)
@@ -83,6 +97,26 @@ def cleanup_old_games():
 
 # 앱 시작 시 정리 작업 시작
 cleanup_old_games()
+
+def get_daily_scenario():
+    """일일 시나리오를 가져옵니다. DB에 없으면 새로 생성합니다."""
+    today = datetime.now().date().isoformat()
+    
+    # DB에서 오늘 시나리오 조회
+    scenario = db.get_daily_scenario(today)
+    if scenario:
+        logger.info(f"DB에서 일일 시나리오 로드: {today}")
+        return scenario
+    
+    # 없으면 새로 생성
+    logger.info(f"새로운 일일 시나리오 생성: {today}")
+    scenario = generate_scenario()
+    
+    # DB에 저장
+    db.save_daily_scenario(today, scenario)
+    
+    return scenario
+
 
 def generate_scenario():
     """LLM을 사용하여 살인 사건 시나리오를 생성합니다."""
@@ -225,13 +259,15 @@ def start_game():
         # 새 세션 ID 생성
         session_id = str(uuid.uuid4())
         
-        # 시나리오 생성
-        scenario = generate_scenario()
+        # 일일 시나리오 가져오기 (DB에서 또는 새로 생성)
+        scenario = get_daily_scenario()
+        today = datetime.now().date().isoformat()
         
-        # 게임 데이터 초기화
+        # 게임 데이터 초기화 (인메모리)
         games[session_id] = {
             'session_id': session_id,
             'scenario': scenario,
+            'scenario_date': today,
             'culprit': scenario['culprit'],
             'npcs': scenario['npcs'],
             'questions': [],  # {npc_name, question, answer, quality_score, reasoning}
@@ -239,6 +275,9 @@ def start_game():
             'start_time': datetime.now().isoformat(),
             'is_finished': False
         }
+        
+        # DB에 게임 세션 저장
+        db.create_game_session(session_id, today, scenario['culprit'])
         
         # 클라이언트에 전달할 시나리오 정보 (범인 정보 제외)
         public_scenario = {
@@ -259,6 +298,8 @@ def start_game():
             ],
             'key_evidence': scenario.get('key_evidence', [])
         }
+        
+        logger.info(f"새 게임 시작: {session_id}, 날짜: {today}")
         
         return jsonify({
             'success': True,
@@ -343,15 +384,27 @@ def ask_question():
         )
         
         # 질문 기록 저장
+        timestamp = datetime.now()
         question_record = {
             'npc_name': npc_name,
             'question': question,
             'answer': answer,
             'quality_score': evaluation['score'],
             'reasoning': evaluation['reasoning'],
-            'timestamp': datetime.now().isoformat()
+            'timestamp': timestamp.isoformat()
         }
         game['questions'].append(question_record)
+        
+        # DB에 질문 저장
+        db.save_question(
+            session_id=session_id,
+            npc_name=npc_name,
+            question=question,
+            answer=answer,
+            quality_score=evaluation['score'],
+            reasoning=evaluation['reasoning'],
+            timestamp=timestamp
+        )
         
         return jsonify({
             'success': True,
@@ -434,6 +487,18 @@ def accuse_culprit():
             game['end_time'] = datetime.now().isoformat()
             game['final_score'] = score_info
             
+            # DB에 게임 결과 저장
+            db.finish_game_session(
+                session_id=session_id,
+                solved=True,
+                accused_npc=suspect_name,
+                questions_count=question_count,
+                hints_used=game['hints_used'],
+                score_info=score_info
+            )
+            
+            logger.info(f"게임 성공: {session_id}, 점수: {score_info['total_score']}")
+            
             return jsonify({
                 'success': True,
                 'data': {
@@ -444,6 +509,9 @@ def accuse_culprit():
                 }
             })
         else:
+            # 오답인 경우 (게임은 계속됨)
+            logger.info(f"오답: {session_id}, 지목: {suspect_name}, 실제 범인: {game['culprit']}")
+            
             return jsonify({
                 'success': True,
                 'data': {
@@ -574,6 +642,66 @@ def get_game_state(session_id):
             'final_score': game.get('final_score')
         }
     })
+
+@app.route('/stats/today', methods=['GET'])
+def get_today_statistics():
+    """오늘의 게임 통계"""
+    try:
+        today = datetime.now().date().isoformat()
+        stats = db.get_today_stats(today)
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'date': today,
+                'stats': stats
+            }
+        })
+    except Exception as e:
+        logger.error(f"오늘 통계 조회 오류: {e}")
+        return jsonify({
+            'success': False,
+            'error': '통계 조회 중 오류가 발생했습니다.'
+        }), 500
+
+@app.route('/stats/leaderboard', methods=['GET'])
+def get_today_leaderboard():
+    """오늘의 리더보드 (상위 10명)"""
+    try:
+        today = datetime.now().date().isoformat()
+        limit = int(request.args.get('limit', 10))
+        leaderboard = db.get_leaderboard(today, limit)
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'date': today,
+                'leaderboard': leaderboard
+            }
+        })
+    except Exception as e:
+        logger.error(f"리더보드 조회 오류: {e}")
+        return jsonify({
+            'success': False,
+            'error': '리더보드 조회 중 오류가 발생했습니다.'
+        }), 500
+
+@app.route('/stats/total', methods=['GET'])
+def get_total_statistics():
+    """전체 게임 통계"""
+    try:
+        stats = db.get_total_stats()
+        
+        return jsonify({
+            'success': True,
+            'data': stats
+        })
+    except Exception as e:
+        logger.error(f"전체 통계 조회 오류: {e}")
+        return jsonify({
+            'success': False,
+            'error': '통계 조회 중 오류가 발생했습니다.'
+        }), 500
 
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 5001))
